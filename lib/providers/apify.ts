@@ -22,7 +22,6 @@ const ACTOR = process.env.APIFY_ACTOR_ID; // "username~actor-name" or the actor 
 
 export const apifyConfigured = Boolean(TOKEN && ACTOR);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = Record<string, any>;
 
 const CACHE_TTL_MS = 15 * 60 * 1000;

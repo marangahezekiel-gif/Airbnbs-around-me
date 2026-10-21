@@ -20,7 +20,6 @@ const DELEGATE: Record<TableName, string> = {
   bookings: 'booking',
 };
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const g = globalThis as unknown as { __aamPrisma?: any };
 
 async function delegate(table: TableName): Promise<any> {

@@ -29,13 +29,13 @@ export function sniffImageType(b: Buffer): Mime | null {
   return null;
 }
 
-const useSupabase = () => Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+const hasSupabase = () => Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 /** Store an image and return the URL to save on the listing. */
 export async function saveImage(data: Buffer, mime: Mime): Promise<string> {
   const name = `${randomUUID()}.${EXT[mime]}`;
 
-  if (useSupabase()) {
+  if (hasSupabase()) {
     const base = process.env.SUPABASE_URL!.replace(/\/$/, '');
     const res = await fetch(`${base}/storage/v1/object/${BUCKET}/${name}`, {
       method: 'POST',
