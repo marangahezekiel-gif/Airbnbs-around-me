@@ -3,6 +3,12 @@
 /**
  * Interactive Mapbox GL map.
  *
+ * Two uses:
+ *  - Explore: price pills for every listing (host-created ones get a coral ring).
+ *  - Host listing form: pass `draggablePin` to get ONE draggable pin the host
+ *    drops on the exact spot (tap/click the map or drag the pin). In that mode
+ *    the listing props can be left out.
+ *
  * - One price-pill HTML marker per listing (Airbnb-style).
  * - `activeId` / `hoverId` highlight pins (driven by the list on the left).
  * - `focus` flies the camera (search, "Around Me Now"); `bottomPad` keeps the
@@ -24,17 +30,27 @@ export interface MapFocus extends LatLng {
   zoom?: number;
 }
 
+export interface DraggablePin {
+  /** null = not placed yet (the first tap on the map places it) */
+  position: LatLng | null;
+  onChange: (p: LatLng) => void;
+}
+
 interface Props {
   initialCenter: LatLng;
   focus: MapFocus | null;
-  user: LatLng | null;
-  listings: Listing[];
-  activeId: string | null;
-  hoverId: string | null;
-  bottomPad: number;
-  onSelect: (id: string | null) => void;
-  onSearchArea: (center: LatLng) => void;
+  user?: LatLng | null;
+  listings?: Listing[];
+  activeId?: string | null;
+  hoverId?: string | null;
+  bottomPad?: number;
+  onSelect?: (id: string | null) => void;
+  onSearchArea?: (center: LatLng) => void;
+  draggablePin?: DraggablePin;
 }
+
+const NO_LISTINGS: Listing[] = [];
+const noop = () => undefined;
 
 interface PinRefs {
   marker: mapboxgl.Marker;
@@ -45,19 +61,22 @@ interface PinRefs {
 export default function MapView({
   initialCenter,
   focus,
-  user,
-  listings,
-  activeId,
-  hoverId,
-  bottomPad,
-  onSelect,
+  user = null,
+  listings = NO_LISTINGS,
+  activeId = null,
+  hoverId = null,
+  bottomPad = 0,
+  onSelect = noop,
   onSearchArea,
+  draggablePin,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const pinsRef = useRef<Map<string, PinRefs>>(new Map());
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
+  const pinMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const pinChangeRef = useRef(draggablePin?.onChange);
   const onSelectRef = useRef(onSelect);
   const bottomPadRef = useRef(bottomPad);
   const [ready, setReady] = useState(false);
@@ -69,6 +88,9 @@ export default function MapView({
   useEffect(() => {
     bottomPadRef.current = bottomPad;
   }, [bottomPad]);
+  useEffect(() => {
+    pinChangeRef.current = draggablePin?.onChange;
+  }, [draggablePin?.onChange]);
 
   // ── create the map once ─────────────────────────────────────
   useEffect(() => {
@@ -91,7 +113,11 @@ export default function MapView({
     map.on('moveend', (e) => {
       if ((e as { originalEvent?: Event }).originalEvent) setMoved(true);
     });
-    map.on('click', () => onSelectRef.current(null));
+    map.on('click', (e) => {
+      // pin-picking mode: a tap places/moves the pin; otherwise it clears the selection
+      if (pinChangeRef.current) pinChangeRef.current({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+      else onSelectRef.current(null);
+    });
 
     mapRef.current = map;
 
@@ -104,6 +130,7 @@ export default function MapView({
       ro.disconnect();
       pins.clear();
       userMarkerRef.current = null;
+      pinMarkerRef.current = null;
       map.remove();
       mapRef.current = null;
       setReady(false);
@@ -141,6 +168,7 @@ export default function MapView({
       button.className = 'price-pin';
       button.textContent = price;
       button.setAttribute('aria-label', `${l.title}, ${price} per night`);
+      if (l.source === 'host') button.dataset.source = 'host'; // bookable here → coral ring
       if (seenRef.current.has(l.id)) button.dataset.seen = 'true';
       button.addEventListener('click', (e) => {
         e.stopPropagation(); // don't trigger the map's "clear selection" click
@@ -177,6 +205,29 @@ export default function MapView({
       });
     }
   }, [activeId, hoverId, listings, ready]);
+
+  // ── the draggable "exact location" pin (host listing form) ──
+  const pinLat = draggablePin?.position?.lat;
+  const pinLng = draggablePin?.position?.lng;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    if (pinLat == null || pinLng == null) {
+      pinMarkerRef.current?.remove();
+      pinMarkerRef.current = null;
+      return;
+    }
+    if (!pinMarkerRef.current) {
+      const marker = new mapboxgl.Marker({ color: '#FF5A4D', draggable: true }).setLngLat([pinLng, pinLat]).addTo(map);
+      marker.on('dragend', () => {
+        const p = marker.getLngLat();
+        pinChangeRef.current?.({ lat: p.lat, lng: p.lng });
+      });
+      pinMarkerRef.current = marker;
+    } else {
+      pinMarkerRef.current.setLngLat([pinLng, pinLat]);
+    }
+  }, [pinLat, pinLng, ready]);
 
   // ── the live "you are here" dot ─────────────────────────────
   useEffect(() => {
@@ -217,12 +268,12 @@ export default function MapView({
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
 
-      {moved && (
+      {moved && onSearchArea && !draggablePin && (
         <button
           type="button"
           onClick={() => {
             const c = mapRef.current?.getCenter();
-            if (c) onSearchArea({ lat: c.lat, lng: c.lng });
+            if (c) onSearchArea?.({ lat: c.lat, lng: c.lng });
             setMoved(false);
           }}
           className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-full bg-charcoal-900 px-4 py-2.5 text-sm font-semibold text-white shadow-float transition hover:bg-charcoal-800 active:scale-95"

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Providers } from '@/components/Providers';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import './globals.css';
 
@@ -44,7 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={sans.variable}>
       <body>
-        {children}
+        <Providers>{children}</Providers>
         <ServiceWorkerRegister />
       </body>
     </html>

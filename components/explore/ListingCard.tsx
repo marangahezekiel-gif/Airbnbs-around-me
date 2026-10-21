@@ -59,16 +59,30 @@ export function ListingCard({ listing: l, distanceLabel, active, onActivate, onH
             Superhost
           </span>
         )}
+        {/* Host-created stays are bookable here: show how many units are free tonight */}
+        {l.source === 'host' && l.unitsTotal != null && (
+          <span
+            className={`absolute bottom-3 right-3 rounded-full px-2.5 py-1 text-xs font-semibold shadow-pin ${
+              l.unitsLeft === 0 ? 'bg-charcoal-900 text-white' : 'bg-white/95 text-charcoal-800'
+            }`}
+          >
+            {l.unitsLeft === 0 ? 'Full tonight' : `${l.unitsLeft} of ${l.unitsTotal} left`}
+          </span>
+        )}
       </div>
 
       <div className="px-1.5 pb-1 pt-3">
         <div className="flex items-start justify-between gap-3">
           <h3 className="line-clamp-1 text-[15px] font-bold leading-snug">{l.title}</h3>
-          <span className="flex shrink-0 items-center gap-1 text-sm font-semibold">
-            <span aria-hidden="true" className="text-coral-500">★</span>
-            {formatRating(l.rating)}
-            <span className="font-normal text-charcoal-400">({l.reviewCount})</span>
-          </span>
+          {l.reviewCount > 0 ? (
+            <span className="flex shrink-0 items-center gap-1 text-sm font-semibold">
+              <span aria-hidden="true" className="text-coral-500">★</span>
+              {formatRating(l.rating)}
+              <span className="font-normal text-charcoal-400">({l.reviewCount})</span>
+            </span>
+          ) : (
+            <span className="shrink-0 rounded-full bg-coral-50 px-2.5 py-0.5 text-xs font-bold text-coral-700">New</span>
+          )}
         </div>
 
         <p className="mt-0.5 text-sm text-charcoal-500">

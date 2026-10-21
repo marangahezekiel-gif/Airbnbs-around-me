@@ -35,3 +35,15 @@ export const initials = (name: string) =>
     .slice(0, 2)
     .join('')
     .toUpperCase();
+
+/** "Mar 3 – Mar 7, 2027" from two yyyy-mm-dd strings (checkOut is the morning the guest leaves). */
+export function formatStay(checkIn: string, checkOut: string): string {
+  const fmt = (iso: string, withYear: boolean) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      ...(withYear ? { year: 'numeric' } : {}),
+      timeZone: 'UTC',
+    });
+  return `${fmt(checkIn, false)} – ${fmt(checkOut, true)}`;
+}

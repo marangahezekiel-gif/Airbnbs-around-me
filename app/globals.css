@@ -51,6 +51,9 @@ body {
 .price-pin[data-hover='true'] {
   transform: scale(1.1);
 }
+.price-pin[data-source='host'] {
+  box-shadow: 0 1px 2px rgba(31, 35, 40, 0.18), 0 0 0 2px #ff5a4d;
+}
 .price-pin[data-active='true'] {
   background: #1f2328;
   color: #fff;

@@ -48,7 +48,8 @@ export async function GET(req: NextRequest) {
   try {
     const result = await searchListings(params);
     return NextResponse.json(result, {
-      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      // Short CDN cache: host-created listings and "units left" change as hosts edit and guests book.
+      headers: { 'Cache-Control': 'public, s-maxage=20, stale-while-revalidate=60' },
     });
   } catch (err) {
     console.error('[api/listings]', err);

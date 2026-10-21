@@ -1,0 +1,85 @@
+// Prisma schema for the marketplace (profiles, listings, units, bookings).
+//
+// Local quick start (SQLite):
+//   1. set  DATABASE_URL="file:./dev.db"  in .env  (Prisma reads .env, not .env.local)
+//   2. npx prisma generate
+//   3. npx prisma db push
+//
+// To use Postgres instead, change `provider` to "postgresql" and point
+// DATABASE_URL at your database. List columns are JSON strings on purpose so
+// the same schema works on every database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id           String @id
+  email        String @unique
+  name         String
+  role         String // "host" | "guest"
+  passwordHash String
+  createdAt    String
+}
+
+model Listing {
+  id            String  @id
+  hostId        String
+  title         String
+  description   String
+  pricePerNight Float
+  currency      String
+  propertyType  String // "entire_place" | "private_room"
+  bedrooms      Int
+  beds          Int
+  bathrooms     Float
+  maxGuests     Int
+  amenities     String // JSON array
+  houseRules    String
+  photos        String // JSON array of URLs
+  address       String
+  neighborhood  String
+  lat           Float
+  lng           Float
+  instantBook   Boolean
+  blockedDates  String // JSON array of yyyy-mm-dd
+  createdAt     String
+  updatedAt     String
+
+  @@index([hostId])
+}
+
+model Unit {
+  id        String @id
+  listingId String
+  label     String
+
+  @@index([listingId])
+}
+
+model Booking {
+  id         String  @id
+  listingId  String
+  unitId     String?
+  guestId    String
+  guestName  String
+  guestEmail String
+  checkIn    String // yyyy-mm-dd
+  checkOut   String // yyyy-mm-dd (exclusive)
+  guests     Int
+  note       String
+  nights     Int
+  totalPrice Float
+  currency   String
+  status     String // "pending" | "accepted" | "rejected" | "cancelled"
+  createdAt  String
+  decidedAt  String?
+
+  @@index([listingId])
+  @@index([guestId])
+}

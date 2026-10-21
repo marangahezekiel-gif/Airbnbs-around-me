@@ -9,7 +9,7 @@
  *
  * Bump VERSION to invalidate all caches on the next deploy.
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHES = {
   static: `aam-static-${VERSION}`,
   pages: `aam-pages-${VERSION}`,
@@ -17,6 +17,8 @@ const CACHES = {
   img: `aam-img-${VERSION}`,
 };
 const OFFLINE_URL = '/offline';
+// Signed-in pages must never be stored: a cached dashboard could be shown to the next person on a shared device.
+const PRIVATE_PAGE = /^\/(host|trips|account|signin|signup)(\/|$)/;
 const PRECACHE = ['/icons/icon-192.png', '/icons/icon-512.png'];
 
 // ───────────────────────── lifecycle ─────────────────────────
@@ -60,13 +62,16 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
 
   if (req.mode === 'navigate') {
-    event.respondWith(handleNavigation(req));
+    event.respondWith(handleNavigation(req, PRIVATE_PAGE.test(url.pathname)));
     return;
   }
 
   if (url.origin === self.location.origin) {
     if (url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/icons/')) {
       event.respondWith(cacheFirst(req, CACHES.static));
+    } else if (url.pathname.startsWith('/api/uploads/')) {
+      // host photos are immutable (random file names), so cache-first is safe
+      event.respondWith(cacheFirst(req, CACHES.img));
     } else if (url.pathname === '/api/listings') {
       event.respondWith(networkFirstJson(req, CACHES.api, 6000, 40));
     }
@@ -101,15 +106,15 @@ async function trim(cacheName, max) {
   for (let i = 0; i < keys.length - max; i++) await cache.delete(keys[i]);
 }
 
-async function handleNavigation(req) {
+async function handleNavigation(req, isPrivate) {
   const cache = await caches.open(CACHES.pages);
   try {
     const res = await fetchWithTimeout(req, 5000);
-    if (res.ok) cache.put(req, res.clone());
+    if (res.ok && !isPrivate) cache.put(req, res.clone());
     return res;
   } catch (_) {
     // Offline: reuse any cached copy of this page (ignoring ?query so /explore?lat=… still opens the shell)
-    const hit = (await cache.match(req)) || (await cache.match(req, { ignoreSearch: true }));
+    const hit = isPrivate ? null : (await cache.match(req)) || (await cache.match(req, { ignoreSearch: true }));
     if (hit) return hit;
     const offline = await caches.match(OFFLINE_URL);
     return offline || new Response('You are offline.', { status: 503, headers: { 'Content-Type': 'text/plain' } });

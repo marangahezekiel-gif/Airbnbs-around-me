@@ -14,6 +14,8 @@ export interface LatLng {
 export type PropertyType = 'entire_place' | 'private_room';
 
 export interface Host {
+  /** Set for marketplace hosts (profile id) */
+  id?: string;
   name: string;
   avatar?: string;
   isSuperhost: boolean;
@@ -61,6 +63,15 @@ export interface Listing {
   affiliateUrl?: string;
   /** Distance in km from the search centre (the client may recompute from the user) */
   distanceKm?: number;
+
+  // ── marketplace fields (only set for listings created by hosts on this site) ──
+  /** 'host' = created on this site and bookable here; anything else is an external listing */
+  source?: 'host' | 'external';
+  address?: string;
+  houseRules?: string;
+  /** Rentable units in total, and how many are free tonight */
+  unitsTotal?: number;
+  unitsLeft?: number;
 }
 
 export interface SearchParams {

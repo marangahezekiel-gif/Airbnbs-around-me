@@ -6,7 +6,7 @@ import type { Listing, SearchParams } from '../types';
  * `getProvider()` in ./index.ts.
  */
 export interface ListingProvider {
-  name: 'mock' | 'apify';
+  name: 'mock' | 'apify' | 'marketplace';
   /** Return candidate listings near the search centre. Filtering is applied afterwards. */
   search(params: SearchParams): Promise<Listing[]>;
   /** Return one listing by id, or null if unknown. */

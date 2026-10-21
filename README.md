@@ -1,8 +1,10 @@
 # Airbnbs Around Me
 
-Find perfect Airbnbs around you in seconds. A website that doubles as an installable mobile app (PWA): it asks for your location, shows nearby stays on a live map, and sends people to Airbnb through your affiliate link.
+Find perfect Airbnbs around you in seconds. A website that doubles as an installable mobile app (PWA): it asks for your location and shows nearby stays on a live map.
 
-**Stack:** Next.js 14 (App Router) · TypeScript · Tailwind CSS · Mapbox GL JS · hand-written service worker (PWA) · deploys to Vercel.
+It is also a **two-sided marketplace**: people sign up as a **host** (list places, set the exact pin, manage booking requests) or a **guest** (find stays near them, request or instantly book, get directions). Stays that aren't hosted here still link out to Airbnb through your affiliate link. See [section 12](#12-two-sided-marketplace-hosts--guests).
+
+**Stack:** Next.js 14 (App Router) · TypeScript · Tailwind CSS · Mapbox GL JS · NextAuth (email + password) · zod · Supabase or Prisma/SQLite (or a local JSON file) · hand-written service worker (PWA) · deploys to Vercel.
 
 > Not affiliated with Airbnb, Inc. Listings sourced via public data.
 
@@ -16,7 +18,7 @@ cp .env.example .env.local      # then add your Mapbox token (step 2)
 npm run dev                     # http://localhost:3000
 ```
 
-Out of the box the app uses **mock listings** generated around whatever location you open, so every feature (map, filters, detail page, calendar) works immediately. Real data is a one-file swap (step 4).
+Out of the box the app uses **mock listings** generated around whatever location you open, so every feature (map, filters, detail page, calendar) works immediately. Sign-up, the host dashboard and bookings also work with no setup: accounts and listings are saved to a local file in `.data/` (see section 12 for a real database). Real listings from Airbnb are a one-file swap (step 4).
 
 > Geolocation needs a secure origin. `localhost` counts as secure; on a phone use your Vercel URL or an HTTPS tunnel.
 
@@ -41,6 +43,12 @@ Without a token the list still works and the map area shows a setup message. The
 | `NEXT_PUBLIC_MAPBOX_TOKEN` | **Yes** | Map + place search |
 | `NEXT_PUBLIC_SITE_URL` | Recommended | Your production URL (used for metadata) |
 | `NEXT_PUBLIC_DEFAULT_LAT/LNG/PLACE` | Optional | Map start if the user denies location |
+| `NEXTAUTH_SECRET` | **Production** | Signs session cookies. `openssl rand -base64 32`. A dev-only fallback is used locally |
+| `NEXTAUTH_URL` | Production (non-Vercel) | Your public URL. Vercel sets it automatically |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Recommended for production | Use Supabase for data and photo storage (section 12) |
+| `DATABASE_URL` | Optional | Use Prisma + SQLite locally, e.g. `file:./dev.db` (section 12) |
+| `INCLUDE_EXTERNAL_LISTINGS` | Optional | `false` = show only host-created listings |
+| `DATA_DIR`, `UPLOAD_DIR` | Optional | Where the local JSON database / uploaded photos live |
 | `APIFY_TOKEN`, `APIFY_ACTOR_ID` | Optional | Switch from mock to real listings (step 4) |
 | `AFFILIATE_PARAMS` or `AFFILIATE_LINK_TEMPLATE` | Optional | Affiliate tracking (step 5) |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Optional | Price-drop push notifications (step 7) |
@@ -115,7 +123,7 @@ The scaffolding is in place; the server side is a stub you finish when you want 
 
 1. Push the project to GitHub.
 2. At <https://vercel.com/new> import the repo. Vercel detects Next.js; keep the default build settings.
-3. Under **Environment Variables** add the values from step 3 (at least `NEXT_PUBLIC_MAPBOX_TOKEN` and `NEXT_PUBLIC_SITE_URL`) for Production (and Preview if you want).
+3. Under **Environment Variables** add the values from step 3 — at least `NEXT_PUBLIC_MAPBOX_TOKEN`, `NEXT_PUBLIC_SITE_URL`, `NEXTAUTH_SECRET`, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (Vercel's filesystem isn't persistent, so hosts need Supabase; see section 12) — for Production (and Preview if you want).
 4. Deploy. Then add your Mapbox URL restriction for the new domain.
 5. Test on a real phone: location prompt, *Add to Home Screen*, airplane-mode reload.
 
@@ -131,26 +139,41 @@ airbnbs-around-me/
 │  ├─ layout.tsx               fonts, metadata, viewport, SW registration
 │  ├─ page.tsx                 landing page (hero, how it works, features, install)
 │  ├─ explore/page.tsx         map + list experience
-│  ├─ listing/[id]/page.tsx    detail: gallery, host, amenities, calendar, reviews, affiliate CTA
+│  ├─ listing/[id]/page.tsx    detail: gallery, host, amenities, exact-location map + directions, booking panel (or Airbnb CTA)
+│  ├─ signin, signup, account  auth pages + host/guest role switch
+│  ├─ host/                    dashboard, listings/new, listings/[id]/edit  (hosts only)
+│  ├─ trips/page.tsx           guest's bookings (cancel, directions)
 │  ├─ offline/page.tsx         service-worker fallback
 │  ├─ manifest.ts              PWA manifest
 │  ├─ icon.svg, apple-icon.png favicon + iOS icon
 │  └─ api/
 │     ├─ listings/route.ts     GET search (filters, radius)
-│     ├─ geocode/route.ts      GET place search (Mapbox, Nominatim fallback)
+│     ├─ geocode/route.ts      GET place search + reverse lookup (Mapbox, Nominatim fallback)
+│     ├─ auth/[...nextauth], register, account/role     sign-in, sign-up, role switch
+│     ├─ host/listings, host/bookings/[id]              host CRUD + accept/reject
+│     ├─ bookings, bookings/[id]                        guest request / cancel
+│     ├─ upload, uploads/[name]                         photo upload + local serving
 │     └─ push/subscribe/route.ts   POST (stub)
 ├─ components/
 │  ├─ explore/                 ExplorePage (state), MapView, ListPanel (bottom sheet),
 │  │                           ListingCard, FiltersModal, SearchBar, AroundMeButton
-│  ├─ listing/                 Gallery, AvailabilityCalendar, PriceAlertButton
+│  ├─ listing/                 Gallery, AvailabilityCalendar, PriceAlertButton, BookingPanel, DateRangePicker, LocationMap
+│  ├─ host/ auth/ trips/ calendar/   listing form, location picker, uploader, user menu, role switch
 │  ├─ landing/                 HeroSearch, HeroMap, InstallSection
 │  └─ Logo, Header, Footer, InstallPrompt, ServiceWorkerRegister
 ├─ hooks/                      useGeolocation, useMediaQuery
 ├─ lib/
 │  ├─ types.ts                 Listing & friends — the one shape the UI depends on
 │  ├─ providers/               mock.ts, apify.ts, index.ts  ← swap data sources here
-│  ├─ listings.ts              filters + distance + affiliate decoration
+│  ├─ listings.ts              merges host listings + external source, filters, distance, affiliate links
+│  ├─ auth.ts, api-auth.ts, auth-secret.ts, password.ts, rate-limit.ts   sessions & guards
+│  ├─ db/                      storage drivers: json (default), prisma, supabase
+│  ├─ marketplace/             repo.ts (all reads/writes + booking rules), schemas.ts (zod), availability.ts
+│  ├─ storage.ts, directions.ts photo storage, Google Maps directions link
 │  ├─ affiliate.ts, filters.ts, geo.ts, format.ts, geocode.ts, push.ts, mock-data.ts
+├─ middleware.ts               protects /host/*, /trips/*, /account/*
+├─ prisma/schema.prisma        optional Prisma + SQLite schema
+├─ supabase/schema.sql         Supabase tables
 ├─ public/
 │  ├─ sw.js                    service worker
 │  └─ icons/                   generated PNG icons
@@ -173,3 +196,46 @@ airbnbs-around-me/
 - The availability calendar is **indicative** unless your provider fills `Listing.blockedDates`.
 - Rating, price and review fields from scrapers vary; validate them in `normalize()`.
 - Push notifications need the server work in step 7 before they do anything.
+- Host-created listings start with no reviews (shown as "New"); there is no review system yet.
+
+## 12. Two-sided marketplace (hosts & guests)
+
+### How it works
+
+- **Sign up** at `/signup` and choose **guest** or **host**. Accounts are email + password (NextAuth, signed JWT cookie, scrypt-hashed passwords). Switch role any time from the avatar menu or `/account`.
+- **Protected routes:** `/host/*` is hosts only, `/trips` and `/account` need sign-in. The edge middleware checks the cookie; every page and API route re-checks the role against the database, so a stale cookie never grants access.
+- **Hosts** (`/host/dashboard`): create, edit and delete listings with title, description, price per night, **units available**, multiple photos (with previews, cover photo, client-side resize), amenities, house rules, **exact location** and an availability calendar. Location = search an address, then **tap the map or drag the coral pin** (it reuses `MapView.tsx`); you can also type coordinates. Booking requests appear on the dashboard with **Accept / Reject**.
+- **Guests** use `/explore` as before. Host-created listings appear on the same map with price pills (coral ring), "N of M left" on the card, and open `/listing/[id]` with the gallery, house rules, an exact-location map, a **route preview** (drive/walk, Mapbox) and a **Get directions** button that opens Google Maps with the unit's exact lat/lng.
+- **Booking:** the guest picks dates on a calendar that already greys out closed days and days when every unit is taken, then sends a request (or books instantly if the host enabled Instant Book). Accepting assigns a free unit. Hosts can't reduce units below what upcoming confirmed stays need. **No payment is taken** — hosts and guests settle directly; add Stripe in `POST /api/bookings` when ready.
+- External (mock/Apify) listings still show "View on Airbnb" with your affiliate link. Set `INCLUDE_EXTERNAL_LISTINGS=false` to show only host-created ones.
+
+### Choose a database
+
+`lib/db/index.ts` picks the backend from environment variables (first match wins):
+
+| Set | Backend | Use for |
+| --- | --- | --- |
+| `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | Supabase (Postgres + Storage) | **Production / Vercel** |
+| `DATABASE_URL` | Prisma + SQLite | Local development with a real DB |
+| nothing | JSON file in `.data/` | Zero-setup local dev and demos |
+
+**Supabase**
+1. Create a project at <https://supabase.com>.
+2. SQL editor → paste and run `supabase/schema.sql`.
+3. Storage → **New bucket** named `listing-photos`, tick **Public bucket**.
+4. Settings → API: copy the **Project URL** into `SUPABASE_URL` and the **service_role** key into `SUPABASE_SERVICE_ROLE_KEY`. Keep the key server-side only (no `NEXT_PUBLIC_`). Add both in Vercel too.
+
+**Prisma + SQLite (local)**
+```bash
+echo 'DATABASE_URL="file:./dev.db"' >> .env     # Prisma reads .env, not .env.local
+npm run db:generate && npm run db:push
+```
+`@prisma/client` is an optional dependency loaded at runtime, so installs and builds still succeed if Prisma's engine can't be downloaded. SQLite files don't persist on Vercel; for Postgres change `provider` in `prisma/schema.prisma`.
+
+### Things to know before launch
+
+- Set `NEXTAUTH_SECRET` in production (the dev fallback is refused there).
+- Rate limiting and booking checks run in memory, per server instance. With several instances, move them to a database constraint or Redis.
+- There is no email verification, password reset or payment yet. For magic links add NextAuth's `EmailProvider` (needs SMTP).
+- Signed-in pages (`/host`, `/trips`, `/account`) are never cached by the service worker, so a shared phone can't show the previous user's data offline.
+- Guests see the host's exact pin on the public listing page, as requested. If you'd rather reveal it after acceptance, gate `LocationMap` in `app/listing/[id]/page.tsx`.

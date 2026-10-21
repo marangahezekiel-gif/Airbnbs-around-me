@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { UserMenu } from './auth/UserMenu';
 import { InstallButton } from './InstallPrompt';
 import { Logo } from './Logo';
 
@@ -23,6 +24,7 @@ export function Header({ transparent = false }: { transparent?: boolean }) {
             Features
           </Link>
           <InstallButton className="hidden md:inline-flex" />
+          <UserMenu />
           <Link
             href="/explore?locate=1"
             className="rounded-full bg-coral-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-coral-600 active:scale-95"

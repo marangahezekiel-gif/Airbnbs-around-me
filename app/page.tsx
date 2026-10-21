@@ -103,6 +103,44 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* ── For hosts ── */}
+        <section id="host" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
+          <div className="grid items-center gap-10 rounded-[2rem] bg-charcoal-900 p-8 text-white sm:p-14 lg:grid-cols-[1.2fr_.8fr]">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-widest text-coral-300">For hosts</p>
+              <h2 className="mt-3 text-3xl font-extrabold leading-tight sm:text-4xl">Got a place to rent? Let nearby guests find it.</h2>
+              <p className="mt-4 max-w-xl text-lg leading-relaxed text-charcoal-200">
+                List it in minutes: add photos, drop a pin on the exact entrance, set your price and how many units you have.
+                Guests around you see it on the map right away and send booking requests you can accept or decline.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href="/signup?role=host"
+                  className="rounded-full bg-coral-500 px-7 py-3.5 font-bold text-white transition hover:bg-coral-400 active:scale-95"
+                >
+                  List your place
+                </Link>
+                <Link
+                  href="/signin?callbackUrl=%2Fhost%2Fdashboard"
+                  className="rounded-full border border-white/30 px-7 py-3.5 font-bold transition hover:border-white active:scale-95"
+                >
+                  Host sign in
+                </Link>
+              </div>
+            </div>
+            <ul className="space-y-3 text-charcoal-100">
+              {['Exact pin guests can navigate to', 'Units left shown live on the map', 'Instant Book or approve each request', 'Close dates any time with your calendar'].map(
+                (t) => (
+                  <li key={t} className="flex items-start gap-3 rounded-2xl bg-white/5 px-4 py-3">
+                    <span aria-hidden="true" className="mt-0.5 text-coral-300">✓</span>
+                    {t}
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>
+        </section>
+
         <InstallSection />
 
         {/* ── Final CTA ── */}

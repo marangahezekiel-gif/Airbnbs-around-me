@@ -5,7 +5,7 @@
  */
 import { buildAffiliateUrl } from './affiliate';
 import { haversineKm } from './geo';
-import { getProvider, getProviderForId } from './providers';
+import { getProvider, getProviderForId, marketplaceProvider } from './providers';
 import type { LatLng, Listing, SearchParams } from './types';
 
 export function applyFilters(items: Listing[], p: SearchParams): Listing[] {
@@ -25,19 +25,34 @@ export function applyFilters(items: Listing[], p: SearchParams): Listing[] {
 function decorate(l: Listing, from?: LatLng): Listing {
   return {
     ...l,
-    affiliateUrl: buildAffiliateUrl(l.airbnbUrl),
+    // Host-created listings are booked on this site, so they have no Airbnb link.
+    affiliateUrl: l.source === 'host' ? undefined : buildAffiliateUrl(l.airbnbUrl),
     distanceKm: from ? haversineKm(from, l) : l.distanceKm,
   };
 }
 
+/**
+ * Set INCLUDE_EXTERNAL_LISTINGS=false once you have enough hosts of your own
+ * to show only bookable, host-created stays. Default: also show the external
+ * source (mock data / Apify) so the map is never empty.
+ */
+const includeExternal = () => process.env.INCLUDE_EXTERNAL_LISTINGS !== 'false';
+
 export async function searchListings(params: SearchParams) {
   const provider = getProvider();
-  const raw = await provider.search(params);
+  const [hosted, external] = await Promise.all([
+    // A database hiccup must not take the whole map down: log it and carry on.
+    marketplaceProvider.search(params).catch((err) => {
+      console.error('[listings] marketplace unavailable', err);
+      return [] as Listing[];
+    }),
+    includeExternal() ? provider.search(params) : Promise.resolve([] as Listing[]),
+  ]);
   const centre: LatLng = { lat: params.lat, lng: params.lng };
-  const listings = applyFilters(raw, params)
+  const listings = applyFilters([...hosted, ...external], params)
     .map((l) => decorate(l, centre))
     .sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
-  return { source: provider.name, listings };
+  return { source: includeExternal() ? provider.name : 'marketplace', listings };
 }
 
 export async function getListingById(id: string): Promise<Listing | null> {

@@ -8,13 +8,18 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "mapbox-gl": "^3.7.0",
     "next": "^14.2.15",
+    "next-auth": "^4.24.10",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20.16.0",
@@ -27,5 +32,9 @@
     "sharp": "^0.33.5",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3"
+  },
+  "optionalDependencies": {
+    "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0"
   }
 }

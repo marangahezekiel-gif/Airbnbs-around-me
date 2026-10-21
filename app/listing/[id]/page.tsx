@@ -5,9 +5,13 @@ import { Footer } from '@/components/Footer';
 import { Header } from '@/components/Header';
 import { AvailabilityCalendar } from '@/components/listing/AvailabilityCalendar';
 import { Gallery } from '@/components/listing/Gallery';
+import { BookingPanel } from '@/components/listing/BookingPanel';
+import { LocationMap } from '@/components/listing/LocationMap';
 import { PriceAlertButton } from '@/components/listing/PriceAlertButton';
+import { googleMapsDirectionsUrl } from '@/lib/directions';
 import { formatPrice, formatRating, formatReviewDate, initials, propertyTypeLabel } from '@/lib/format';
 import { getListingById } from '@/lib/listings';
+import { getListing, occupiedByListing } from '@/lib/marketplace/repo';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +32,12 @@ export default async function ListingPage({ params }: Props) {
 
   const price = formatPrice(l.pricePerNight, l.currency);
   const affiliateUrl = l.affiliateUrl ?? l.airbnbUrl;
+
+  // Host-created listings are booked on this site; everything else sends people to Airbnb.
+  const hosted = l.source === 'host';
+  const record = hosted ? await getListing(l.id) : null;
+  const occupied = record ? ((await occupiedByListing([l.id])).get(l.id) ?? []) : [];
+  const directionsUrl = googleMapsDirectionsUrl({ lat: l.lat, lng: l.lng });
   const backHref = `/explore?lat=${l.lat.toFixed(4)}&lng=${l.lng.toFixed(4)}&name=${encodeURIComponent(l.neighborhood || 'This area')}`;
 
   const facts = [
@@ -47,10 +57,16 @@ export default async function ListingPage({ params }: Props) {
 
         <h1 className="mt-4 text-2xl font-extrabold leading-tight sm:text-3xl">{l.title}</h1>
         <p className="mt-2 flex flex-wrap items-center gap-x-2 text-sm text-charcoal-600">
-          <span className="font-semibold text-charcoal-900">
-            <span aria-hidden="true" className="text-coral-500">★</span> {formatRating(l.rating)}
-          </span>
-          <span>· {l.reviewCount} reviews</span>
+          {l.reviewCount > 0 ? (
+            <>
+              <span className="font-semibold text-charcoal-900">
+                <span aria-hidden="true" className="text-coral-500">★</span> {formatRating(l.rating)}
+              </span>
+              <span>· {l.reviewCount} reviews</span>
+            </>
+          ) : (
+            <span className="rounded-full bg-coral-50 px-2.5 py-0.5 text-xs font-bold text-coral-700">New</span>
+          )}
           {l.neighborhood && <span>· {l.neighborhood}</span>}
           {l.host.isSuperhost && <span className="rounded-full bg-charcoal-900 px-2.5 py-0.5 text-xs font-semibold text-white">Superhost</span>}
         </p>
@@ -69,7 +85,8 @@ export default async function ListingPage({ params }: Props) {
                 </h2>
                 <p className="mt-1 text-charcoal-500">{facts.join(' · ')}</p>
                 <p className="mt-1 text-sm text-charcoal-500">
-                  {l.host.yearsHosting} year{l.host.yearsHosting > 1 ? 's' : ''} hosting{l.instantBook ? ' · Instant Book' : ''}
+                  {l.host.yearsHosting > 0 ? `${l.host.yearsHosting} year${l.host.yearsHosting > 1 ? 's' : ''} hosting` : 'New host'}
+                  {l.instantBook ? ' · Instant Book' : ''}
                 </p>
               </div>
               <span
@@ -99,12 +116,47 @@ export default async function ListingPage({ params }: Props) {
               </ul>
             </section>
 
-            <section aria-labelledby="availability">
-              <h2 id="availability" className="text-xl font-bold">Availability</h2>
-              <div className="mt-4">
-                <AvailabilityCalendar listingId={l.id} airbnbUrl={affiliateUrl} blockedDates={l.blockedDates} />
-              </div>
-            </section>
+            {hosted && l.houseRules && (
+              <section aria-labelledby="rules">
+                <h2 id="rules" className="text-xl font-bold">House rules</h2>
+                <p className="mt-3 whitespace-pre-line leading-relaxed text-charcoal-600">{l.houseRules}</p>
+              </section>
+            )}
+
+            {hosted && (
+              <section aria-labelledby="where">
+                <h2 id="where" className="text-xl font-bold">Where you’ll be</h2>
+                <div className="mt-4">
+                  <LocationMap lat={l.lat} lng={l.lng} title={l.title} address={l.address} />
+                </div>
+              </section>
+            )}
+
+            {hosted && record ? (
+              <section id="book" aria-labelledby="availability" className="scroll-mt-24">
+                <h2 id="availability" className="text-xl font-bold">Book your stay</h2>
+                <div className="mt-4">
+                  <BookingPanel
+                    listingId={l.id}
+                    hostId={record.hostId}
+                    pricePerNight={l.pricePerNight}
+                    currency={l.currency}
+                    maxGuests={l.maxGuests}
+                    instantBook={l.instantBook}
+                    units={record.units}
+                    occupied={occupied}
+                    blockedDates={record.blockedDates}
+                  />
+                </div>
+              </section>
+            ) : (
+              <section aria-labelledby="availability">
+                <h2 id="availability" className="text-xl font-bold">Availability</h2>
+                <div className="mt-4">
+                  <AvailabilityCalendar listingId={l.id} airbnbUrl={affiliateUrl} blockedDates={l.blockedDates} />
+                </div>
+              </section>
+            )}
 
             {l.reviews.length > 0 && (
               <section aria-labelledby="reviews">
@@ -137,19 +189,47 @@ export default async function ListingPage({ params }: Props) {
               <p className="text-2xl">
                 <b className="font-extrabold">{price}</b> <span className="text-base text-charcoal-500">night</span>
               </p>
-              <a
-                href={affiliateUrl}
-                target="_blank"
-                rel="sponsored nofollow noopener noreferrer"
-                className="mt-5 block rounded-full bg-coral-500 px-5 py-3.5 text-center font-bold text-white transition hover:bg-coral-600 active:scale-[.98]"
-              >
-                View on Airbnb
-              </a>
-              <PriceAlertButton listingId={l.id} price={l.pricePerNight} />
-              <p className="mt-4 text-xs leading-relaxed text-charcoal-400">
-                Opens Airbnb in a new tab. This is an affiliate link — we may earn a commission at no extra cost to you.
-                Final prices and availability are set by Airbnb.
-              </p>
+              {hosted ? (
+                <>
+                  {l.unitsTotal != null && (
+                    <p className="mt-2 text-sm text-charcoal-600">
+                      {l.unitsLeft === 0
+                        ? 'Fully booked tonight'
+                        : `${l.unitsLeft} of ${l.unitsTotal} unit${l.unitsTotal > 1 ? 's' : ''} free tonight`}
+                    </p>
+                  )}
+                  <a href="#book" className="mt-5 block rounded-full bg-coral-500 px-5 py-3.5 text-center font-bold text-white transition hover:bg-coral-600 active:scale-[.98]">
+                    {l.instantBook ? 'Check dates & book' : 'Check dates & request'}
+                  </a>
+                  <a
+                    href={directionsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 block rounded-full border border-charcoal-200 px-5 py-3 text-center font-bold transition hover:border-charcoal-900"
+                  >
+                    Get directions
+                  </a>
+                  <p className="mt-4 text-xs leading-relaxed text-charcoal-400">
+                    Hosted directly on Airbnbs Around Me. You won’t be charged when you send a request.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <a
+                    href={affiliateUrl}
+                    target="_blank"
+                    rel="sponsored nofollow noopener noreferrer"
+                    className="mt-5 block rounded-full bg-coral-500 px-5 py-3.5 text-center font-bold text-white transition hover:bg-coral-600 active:scale-[.98]"
+                  >
+                    View on Airbnb
+                  </a>
+                  <PriceAlertButton listingId={l.id} price={l.pricePerNight} />
+                  <p className="mt-4 text-xs leading-relaxed text-charcoal-400">
+                    Opens Airbnb in a new tab. This is an affiliate link — we may earn a commission at no extra cost to you.
+                    Final prices and availability are set by Airbnb.
+                  </p>
+                </>
+              )}
             </div>
           </aside>
         </div>
@@ -160,14 +240,20 @@ export default async function ListingPage({ params }: Props) {
         <p>
           <b className="text-lg font-extrabold">{price}</b> <span className="text-sm text-charcoal-500">night</span>
         </p>
-        <a
-          href={affiliateUrl}
-          target="_blank"
-          rel="sponsored nofollow noopener noreferrer"
-          className="rounded-full bg-coral-500 px-6 py-3 text-sm font-bold text-white active:scale-95"
-        >
-          View on Airbnb
-        </a>
+        {hosted ? (
+          <a href="#book" className="rounded-full bg-coral-500 px-6 py-3 text-sm font-bold text-white active:scale-95">
+            {l.instantBook ? 'Book now' : 'Request to book'}
+          </a>
+        ) : (
+          <a
+            href={affiliateUrl}
+            target="_blank"
+            rel="sponsored nofollow noopener noreferrer"
+            className="rounded-full bg-coral-500 px-6 py-3 text-sm font-bold text-white active:scale-95"
+          >
+            View on Airbnb
+          </a>
+        )}
       </div>
 
       <Footer />

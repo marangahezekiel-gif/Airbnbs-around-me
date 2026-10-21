@@ -9,6 +9,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { UserMenu } from '@/components/auth/UserMenu';
 import { InstallButton } from '@/components/InstallPrompt';
 import { Logo } from '@/components/Logo';
 import { useGeolocation } from '@/hooks/useGeolocation';
@@ -221,6 +222,7 @@ export default function ExplorePage() {
           )}
         </button>
         <InstallButton className="hidden md:inline-flex" />
+        <UserMenu className="shrink-0" />
       </header>
 
       {notice && (
